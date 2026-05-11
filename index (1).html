@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Visit Log" />
+  <title>Visit Log</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    body { background: #0F0F14; color: #F2F2F7; font-family: -apple-system, BlinkMacSystemFont, sans-serif; min-height: 100vh; overscroll-behavior: none; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* HEADER */
+    .header { padding: env(safe-area-inset-top, 44px) 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #0F0F14; position: sticky; top: 0; z-index: 10; }
+    .header-label { font-size: 10px; color: #636366; letter-spacing: 2px; margin-bottom: 6px; font-family: monospace; }
+    .header-title { font-size: 26px; font-weight: 700; color: #F2F2F7; letter-spacing: -0.5px; margin-bottom: 14px; }
+    .tabs { display: flex; gap: 8px; }
+    .tab { background: rgba(255,255,255,0.05); color: #8E8E9A; border: none; border-radius: 20px; padding: 6px 16px; font-weight: 600; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+    .tab.active { background: #E5C46B; color: #000; }
+
+    /* CONTENT */
+    .content { flex: 1; overflow-y: auto; padding: 20px 20px 120px; animation: fadeIn 0.3s ease; }
+
+    /* STATUS CARD */
+    .status-card { border-radius: 18px; padding: 20px; margin-bottom: 20px; }
+    .status-card.idle { background: linear-gradient(135deg, rgba(229,196,107,0.10), rgba(229,196,107,0.03)); border: 1px solid rgba(229,196,107,0.2); }
+    .status-card.active { background: linear-gradient(135deg, rgba(52,199,89,0.12), rgba(52,199,89,0.04)); border: 1px solid rgba(52,199,89,0.25); }
+    .status-label { font-size: 9px; letter-spacing: 1.5px; color: #636366; margin-bottom: 8px; font-family: monospace; }
+    .status-active-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: #34C759; animation: pulse 1.5s infinite; display: inline-block; box-shadow: 0 0 8px #34C759; flex-shrink: 0; }
+    .status-active-text { font-weight: 700; font-size: 16px; color: #34C759; }
+    .status-idle-text { font-weight: 600; font-size: 15px; color: #8E8E9A; }
+    .status-detail { font-family: monospace; font-size: 11px; color: #8E8E9A; margin-top: 2px; word-break: break-all; }
+
+    /* NOTES */
+    .notes-section { margin-bottom: 20px; }
+    .notes-label { font-family: monospace; font-size: 9px; color: #636366; letter-spacing: 1.5px; margin-bottom: 8px; }
+    textarea { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; color: #AEAEB2; font-size: 14px; outline: none; line-height: 1.6; resize: none; font-family: -apple-system, sans-serif; }
+
+    /* STATS */
+    .stats-row { display: flex; gap: 12px; margin-bottom: 24px; }
+    .stat-box { flex: 1; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px 10px; text-align: center; }
+    .stat-box.highlight { border-color: rgba(52,199,89,0.3); }
+    .stat-value { font-family: monospace; font-size: 20px; font-weight: 600; color: #E5C46B; }
+    .stat-box.highlight .stat-value { color: #34C759; }
+    .stat-label { font-family: monospace; font-size: 9px; color: #48484A; margin-top: 4px; }
+
+    /* GPS STATUS */
+    .gps-status { font-family: monospace; font-size: 11px; color: #E5C46B; text-align: center; margin-bottom: 16px; }
+
+    /* BUTTONS */
+    .btn { width: 100%; border: none; border-radius: 14px; padding: 17px 24px; font-weight: 700; font-size: 15px; cursor: pointer; letter-spacing: 0.3px; }
+    .btn-checkin { background: #34C759; color: #000; box-shadow: 0 4px 20px rgba(52,199,89,0.3); }
+    .btn-checkout { background: #FF453A; color: #fff; box-shadow: 0 4px 20px rgba(255,69,58,0.3); }
+    .btn-copy { background: #E5C46B; color: #000; box-shadow: 0 4px 20px rgba(229,196,107,0.2); }
+    .btn-copied { background: #34C759; color: #000; }
+
+    /* HISTORY */
+    .history-header { font-family: monospace; font-size: 10px; color: #636366; letter-spacing: 1.5px; margin-bottom: 16px; }
+    .empty-state { text-align: center; padding: 60px 0; color: #48484A; }
+
+    /* VISIT CARD */
+    .visit-card { border-radius: 14px; padding: 16px 18px; margin-bottom: 10px; cursor: pointer; }
+    .visit-card.active-card { background: linear-gradient(135deg, rgba(52,199,89,0.08), rgba(52,199,89,0.03)); border: 1px solid rgba(52,199,89,0.35); }
+    .visit-card.done-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+    .visit-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .visit-card-meta { font-family: monospace; font-size: 11px; color: #8E8E9A; letter-spacing: 1px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .visit-card-date { font-weight: 600; font-size: 14px; color: #F2F2F7; margin-bottom: 2px; }
+    .visit-card-time { font-family: monospace; font-size: 11px; color: #8E8E9A; }
+    .visit-card-dur { font-family: monospace; font-size: 13px; color: #E5C46B; font-weight: 600; }
+    .visit-card-toggle { font-size: 11px; color: #48484A; margin-top: 4px; }
+    .visit-detail { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .detail-row { margin-bottom: 10px; }
+    .detail-label { font-family: monospace; font-size: 9px; color: #636366; letter-spacing: 1.2px; margin-bottom: 2px; }
+    .detail-value { font-family: monospace; font-size: 12px; color: #AEAEB2; word-break: break-all; }
+    .detail-value.gold { color: #E5C46B; }
+
+    /* REPORT */
+    .report-label { font-family: monospace; font-size: 10px; color: #636366; letter-spacing: 1.5px; margin-bottom: 16px; }
+    pre { font-family: monospace; font-size: 11px; color: #AEAEB2; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; overflow-x: auto; white-space: pre-wrap; line-height: 1.8; margin-bottom: 16px; }
+    .report-hint { font-size: 12px; color: #48484A; text-align: center; margin-top: 12px; line-height: 1.6; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-label">CHILD VISIT TRACKER</div>
+    <div class="header-title">Visit Log</div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('home')">Home</button>
+      <button class="tab" onclick="switchTab('history')">History</button>
+      <button class="tab" onclick="switchTab('report')">Report</button>
+    </div>
+  </div>
+
+  <!-- HOME TAB -->
+  <div id="tab-home" class="content">
+    <!-- Status Card -->
+    <div id="status-card" class="status-card idle">
+      <div class="status-label">CURRENT STATUS</div>
+      <div id="status-idle"><div class="status-idle-text">No active visit — tap Check In to begin</div></div>
+      <div id="status-active" class="hidden">
+        <div class="status-active-row"><span class="pulse-dot"></span><span class="status-active-text">Visit in progress</span></div>
+        <div class="status-detail" id="status-checkin-time"></div>
+        <div class="status-detail" id="status-checkin-loc"></div>
+      </div>
+    </div>
+
+    <!-- Notes (hidden until active) -->
+    <div id="notes-section" class="notes-section hidden">
+      <div class="notes-label">VISIT NOTES (optional)</div>
+      <textarea id="notes-input" rows="4" placeholder="e.g. Collected from school gate, returned at 6pm. Child was well." oninput="saveNotes()"></textarea>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-done">0</div><div class="stat-label">Done</div></div>
+      <div class="stat-box" id="stat-active-box"><div class="stat-value" id="stat-active">0</div><div class="stat-label">Active</div></div>
+    </div>
+
+    <!-- GPS Status -->
+    <div id="gps-status" class="gps-status hidden">◌ Acquiring GPS location...</div>
+
+    <!-- Buttons -->
+    <button id="btn-checkin" class="btn btn-checkin" onclick="handleCheckIn()">● CHECK IN — Start Visit</button>
+    <button id="btn-checkout" class="btn btn-checkout hidden" onclick="handleCheckOut()">■ CHECK OUT — End Visit</button>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="tab-history" class="content hidden">
+    <div class="history-header" id="history-count">0 VISITS ON RECORD</div>
+    <div id="history-list"></div>
+  </div>
+
+  <!-- REPORT TAB -->
+  <div id="tab-report" class="content hidden">
+    <div class="report-label">EXPORTABLE VISIT REPORT</div>
+    <pre id="report-text"></pre>
+    <button id="btn-copy" class="btn btn-copy" onclick="copyReport()">Copy Full Report</button>
+    <div class="report-hint">Paste into email or notes to share with your solicitor or mediator</div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'visit-tracker-v1';
+  let state = { visits: [], activeVisit: null };
+
+  // ── STORAGE ──────────────────────────────────────────────
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) state = JSON.parse(raw);
+    } catch(e) {}
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  }
+
+  // ── FORMATTING ───────────────────────────────────────────
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+
+  function fmtDuration(start, end) {
+    if (!start || !end) return null;
+    const diff = new Date(end) - new Date(start);
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return `${h}h ${m}m ${s}s`;
+  }
+
+  function fmtCoords(lat, lng) {
+    if (lat == null || lng == null) return 'Location unavailable';
+    return `${lat.toFixed(5)}°N, ${lng.toFixed(5)}°${lng < 0 ? 'W' : 'E'}`;
+  }
+
+  // ── GPS ──────────────────────────────────────────────────
+  function getLocation() {
+    return new Promise(resolve => {
+      if (!navigator.geolocation) return resolve({ lat: null, lng: null });
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => resolve({ lat: null, lng: null }),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
+  }
+
+  // ── ACTIONS ──────────────────────────────────────────────
+  async function handleCheckIn() {
+    document.getElementById('gps-status').classList.remove('hidden');
+    document.getElementById('btn-checkin').disabled = true;
+
+    const { lat, lng } = await getLocation();
+    document.getElementById('gps-status').classList.add('hidden');
+
+    state.activeVisit = {
+      id: Date.now(),
+      checkIn: new Date().toISOString(),
+      checkInLat: lat, checkInLng: lng,
+      checkOut: null, checkOutLat: null, checkOutLng: null,
+      notes: ''
+    };
+    saveState();
+    renderHome();
+  }
+
+  async function handleCheckOut() {
+    if (!state.activeVisit) return;
+    document.getElementById('gps-status').classList.remove('hidden');
+    document.getElementById('btn-checkout').disabled = true;
+
+    const { lat, lng } = await getLocation();
+    document.getElementById('gps-status').classList.add('hidden');
+
+    const completed = {
+      ...state.activeVisit,
+      checkOut: new Date().toISOString(),
+      checkOutLat: lat, checkOutLng: lng,
+      notes: document.getElementById('notes-input').value.trim()
+    };
+
+    state.visits.unshift(completed);
+    state.activeVisit = null;
+    saveState();
+    renderHome();
+  }
+
+  function saveNotes() {
+    if (state.activeVisit) {
+      state.activeVisit.notes = document.getElementById('notes-input').value;
+      saveState();
+    }
+  }
+
+  // ── RENDER HOME ──────────────────────────────────────────
+  function renderHome() {
+    const av = state.activeVisit;
+    const total = state.visits.length + (av ? 1 : 0);
+
+    // Status card
+    const card = document.getElementById('status-card');
+    if (av) {
+      card.className = 'status-card active';
+      document.getElementById('status-idle').classList.add('hidden');
+      document.getElementById('status-active').classList.remove('hidden');
+      document.getElementById('status-checkin-time').textContent = 'Started: ' + fmtDate(av.checkIn);
+      document.getElementById('status-checkin-loc').textContent = 'Location: ' + fmtCoords(av.checkInLat, av.checkInLng);
+    } else {
+      card.className = 'status-card idle';
+      document.getElementById('status-idle').classList.remove('hidden');
+      document.getElementById('status-active').classList.add('hidden');
+    }
+
+    // Notes
+    const notesSection = document.getElementById('notes-section');
+    if (av) {
+      notesSection.classList.remove('hidden');
+      document.getElementById('notes-input').value = av.notes || '';
+    } else {
+      notesSection.classList.add('hidden');
+    }
+
+    // Stats
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-done').textContent = state.visits.length;
+    document.getElementById('stat-active').textContent = av ? '1' : '0';
+    const activeBox = document.getElementById('stat-active-box');
+    activeBox.className = av ? 'stat-box highlight' : 'stat-box';
+
+    // Buttons
+    if (av) {
+      document.getElementById('btn-checkin').classList.add('hidden');
+      document.getElementById('btn-checkout').classList.remove('hidden');
+      document.getElementById('btn-checkout').disabled = false;
+    } else {
+      document.getElementById('btn-checkin').classList.remove('hidden');
+      document.getElementById('btn-checkin').disabled = false;
+      document.getElementById('btn-checkout').classList.add('hidden');
+    }
+  }
+
+  // ── RENDER HISTORY ───────────────────────────────────────
+  function renderHistory() {
+    const av = state.activeVisit;
+    const all = av ? [{ ...av, _active: true }, ...state.visits] : [...state.visits];
+    const total = all.length;
+
+    document.getElementById('history-count').textContent = `${total} VISIT${total !== 1 ? 'S' : ''} ON RECORD`;
+
+    const list = document.getElementById('history-list');
+    if (total === 0) {
+      list.innerHTML = '<div class="empty-state">No visits recorded yet</div>';
+      return;
+    }
+
+    list.innerHTML = all.map((v, i) => {
+      const num = String(total - i).padStart(3, '0');
+      const isActive = !!v._active || !v.checkOut;
+      const dur = fmtDuration(v.checkIn, v.checkOut);
+      const dateStr = fmtDate(v.checkIn).split(',')[0];
+      const timeStr = fmtDate(v.checkIn).split(', ')[1] || '';
+      const timeOut = v.checkOut ? fmtDate(v.checkOut).split(', ')[1] : 'ongoing';
+
+      return `
+        <div class="visit-card ${isActive ? 'active-card' : 'done-card'}" onclick="toggleCard(this)">
+          <div class="visit-card-top">
+            <div>
+              <div class="visit-card-meta">
+                ${isActive ? '<span style="background:#34C759;border-radius:50%;width:8px;height:8px;display:inline-block;box-shadow:0 0 6px #34C759;animation:pulse 1.5s infinite;flex-shrink:0"></span>' : ''}
+                VISIT #${num} · ${isActive ? 'ACTIVE' : 'COMPLETED'}
+              </div>
+              <div class="visit-card-date">${dateStr}</div>
+              <div class="visit-card-time">${timeStr} → ${timeOut}</div>
+            </div>
+            <div style="text-align:right">
+              ${dur ? `<div class="visit-card-dur">${dur}</div>` : ''}
+              <div class="visit-card-toggle">▼</div>
+            </div>
+          </div>
+          <div class="visit-detail hidden">
+            <div class="detail-row"><div class="detail-label">CHECK-IN TIME</div><div class="detail-value">${fmtDate(v.checkIn)}</div></div>
+            <div class="detail-row"><div class="detail-label">CHECK-IN LOCATION</div><div class="detail-value">${fmtCoords(v.checkInLat, v.checkInLng)}</div></div>
+            ${v.checkOut ? `
+              <div class="detail-row"><div class="detail-label">CHECK-OUT TIME</div><div class="detail-value">${fmtDate(v.checkOut)}</div></div>
+              <div class="detail-row"><div class="detail-label">CHECK-OUT LOCATION</div><div class="detail-value">${fmtCoords(v.checkOutLat, v.checkOutLng)}</div></div>
+              <div class="detail-row"><div class="detail-label">TOTAL DURATION</div><div class="detail-value gold">${dur}</div></div>
+            ` : ''}
+            ${v.notes ? `<div class="detail-row"><div class="detail-label">NOTES</div><div class="detail-value">${v.notes}</div></div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function toggleCard(el) {
+    const detail = el.querySelector('.visit-detail');
+    const toggle = el.querySelector('.visit-card-toggle');
+    detail.classList.toggle('hidden');
+    toggle.textContent = detail.classList.contains('hidden') ? '▼' : '▲';
+  }
+
+  // ── RENDER REPORT ────────────────────────────────────────
+  function renderReport() {
+    const av = state.activeVisit;
+    const all = av ? [{ ...av, _active: true }, ...state.visits] : [...state.visits];
+    let text = '══════════════════════════════════\n   VISIT LOG — OFFICIAL RECORD\n';
+    text += `   Generated: ${fmtDate(new Date().toISOString())}\n══════════════════════════════════\n\n`;
+
+    if (all.length === 0) {
+      text += 'No visits recorded yet.\n';
+    } else {
+      all.forEach((v, i) => {
+        const num = String(all.length - i).padStart(3, '0');
+        const isActive = !!v._active || !v.checkOut;
+        text += `VISIT #${num}${isActive ? ' [ACTIVE]' : ''}\n`;
+        text += `  Check-in:  ${fmtDate(v.checkIn)}\n`;
+        text += `  Location:  ${fmtCoords(v.checkInLat, v.checkInLng)}\n`;
+        if (v.checkOut) {
+          text += `  Check-out: ${fmtDate(v.checkOut)}\n`;
+          text += `  Location:  ${fmtCoords(v.checkOutLat, v.checkOutLng)}\n`;
+          text += `  Duration:  ${fmtDuration(v.checkIn, v.checkOut)}\n`;
+        } else { text += `  Check-out: Ongoing\n`; }
+        if (v.notes) text += `  Notes:     ${v.notes}\n`;
+        text += '\n';
+      });
+    }
+    text += `══════════════════════════════════\nTotal visits: ${all.length}\n══════════════════════════════════`;
+    document.getElementById('report-text').textContent = text;
+  }
+
+  // ── TABS ─────────────────────────────────────────────────
+  function switchTab(tab) {
+    ['home','history','report'].forEach(t => {
+      document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+      document.querySelectorAll('.tab')[['home','history','report'].indexOf(t)].classList.toggle('active', t === tab);
+    });
+    if (tab === 'history') renderHistory();
+    if (tab === 'report') renderReport();
+  }
+
+  // ── COPY REPORT ──────────────────────────────────────────
+  async function copyReport() {
+    const text = document.getElementById('report-text').textContent;
+    const btn = document.getElementById('btn-copy');
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = '✓ Copied!';
+      btn.className = 'btn btn-copied';
+      setTimeout(() => { btn.textContent = 'Copy Full Report'; btn.className = 'btn btn-copy'; }, 2500);
+    } catch(e) {}
+  }
+
+  // ── INIT ─────────────────────────────────────────────────
+  loadState();
+  renderHome();
+</script>
+</body>
+</html>
